@@ -17,6 +17,7 @@ interface PopupState {
     settings: ReminderSettings;
     daily: DailyStats;
     pendingReminder: boolean;
+    widgetHidden: boolean;
 }
 
 const DEFAULT_SETTINGS: ReminderSettings = {
@@ -52,15 +53,20 @@ function freshDaily(): DailyStats {
 }
 
 async function loadState(): Promise<PopupState> {
-    const stored = await chrome.storage.local.get(['settings', 'daily', 'pendingReminder']);
+    const stored = await chrome.storage.local.get(['settings', 'daily', 'pendingReminder', 'widgetHidden']);
     const savedSettings = stored.settings as Partial<ReminderSettings> | undefined;
     const settings: ReminderSettings = { ...DEFAULT_SETTINGS, ...(savedSettings ?? {}) };
     let daily = stored.daily as DailyStats | undefined;
     if (!daily || daily.date !== todayKey()) daily = freshDaily();
-    return { settings, daily, pendingReminder: Boolean(stored.pendingReminder) };
+    return {
+        settings,
+        daily,
+        pendingReminder: Boolean(stored.pendingReminder),
+        widgetHidden: Boolean(stored.widgetHidden),
+    };
 }
 
-function updateView({ settings, daily, pendingReminder }: PopupState): void {
+function updateView({ settings, daily, pendingReminder, widgetHidden }: PopupState): void {
     settingsInputs.enabled.checked = settings.enabled;
     settingsInputs.intervalMinutes.value = String(settings.intervalMinutes);
     settingsInputs.startTime.value = settings.startTime;
@@ -93,6 +99,7 @@ function updateView({ settings, daily, pendingReminder }: PopupState): void {
         ? 'Your reminder is here whenever you’re ready.'
         : 'Every little sip counts. No pressure.';
     $('drink-button').setAttribute('aria-label', pendingReminder ? 'I drank water, dismiss reminder' : 'I drank water');
+    $('show-widget-button').hidden = !widgetHidden;
 }
 
 async function persistSettings(): Promise<void> {
@@ -142,9 +149,13 @@ for (const input of Object.values(settingsInputs)) {
 }
 $('drink-button').addEventListener('click', recordDrink);
 $('later-button').addEventListener('click', snoozeReminder);
+$('show-widget-button').addEventListener('click', async () => {
+    await chrome.storage.local.set({ widgetHidden: false });
+    updateView(await loadState());
+});
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local' && ('daily' in changes || 'pendingReminder' in changes || 'settings' in changes)) {
+    if (areaName === 'local' && ('daily' in changes || 'pendingReminder' in changes || 'settings' in changes || 'widgetHidden' in changes)) {
         loadState().then(updateView);
     }
 });

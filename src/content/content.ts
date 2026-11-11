@@ -39,7 +39,9 @@ async function loadState(): Promise<WidgetState> {
     return { daily, pendingReminder: Boolean(stored.pendingReminder) };
 }
 
-function mountWidget(): void {
+async function mountWidget(): Promise<void> {
+    const stored = await chrome.storage.local.get('widgetHidden');
+    if (stored.widgetHidden) return;
     if (document.getElementById(HOST_ID)) return;
 
     const host = document.createElement('div');
@@ -68,6 +70,7 @@ function mountWidget(): void {
                 </div>
                 <button id="sip-drink" class="w-full rounded-xl bg-green pl-3 pr-3 py-2.5 text-xs font-bold text-white transition hover:bg-[#28665f] active:scale-[.98]" type="button">✓ &nbsp; I drank water</button>
                 <button id="sip-snooze" class="mt-1.5 w-full rounded-xl pl-3 pr-3 py-2 text-[0.6875rem] font-semibold text-muted transition hover:bg-[#e9eee5]" type="button">Remind me in 15 minutes</button>
+                <button id="sip-hide" class="mt-1 w-full rounded-xl px-3 py-2 text-[0.6875rem] font-semibold text-muted transition hover:bg-[#e9eee5]" type="button">Hide until next reminder</button>
             </section>
             <button id="sip-toggle" class="grid size-19.5 place-items-center rounded-[1.5625rem] border border-white/80 bg-[#eef4e7] shadow-[0_0.5rem_1.5rem_rgba(29,56,54,0.2)] transition hover:-translate-y-1 hover:shadow-[0_0.75rem_1.75rem_rgba(29,56,54,0.25)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green" type="button" aria-label="Open Sip water reminder" aria-expanded="false">
                 <span class="flex h-[4.6875rem] w-[3.625rem] origin-[50%_88%] flex-col items-center animate-sip-float motion-reduce:animate-none" role="img" aria-label="Animated water bottle">
@@ -126,16 +129,41 @@ function mountWidget(): void {
         getElement<HTMLParagraphElement>(shadow, 'sip-status').textContent = 'No problem. I’ll nudge you again in 15 minutes.';
         void chrome.runtime.sendMessage({ type: 'snooze' }).catch(() => undefined);
     });
-
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === 'local' && ('daily' in changes || 'pendingReminder' in changes)) {
-            void loadState().then(render);
-        }
+    getElement<HTMLButtonElement>(shadow, 'sip-hide').addEventListener('click', () => {
+        void chrome.storage.local.set({ widgetHidden: true });
     });
     void loadState().then(render);
 }
 
-mountWidget();
+function renderMountedWidget(state: WidgetState): void {
+    const shadow = document.getElementById(HOST_ID)?.shadowRoot;
+    if (!shadow) return;
+    getElement<HTMLSpanElement>(shadow, 'sip-water').style.setProperty('--water-level', `${state.daily.bottleLevel}%`);
+    getElement<HTMLSpanElement>(shadow, 'sip-progress').style.width = `${Math.min(state.daily.drinks / 8, 1) * 100}%`;
+    getElement<HTMLSpanElement>(shadow, 'sip-count').textContent = `${state.daily.drinks} ${state.daily.drinks === 1 ? 'glass' : 'glasses'}`;
+    getElement<HTMLParagraphElement>(shadow, 'sip-status').textContent = state.pendingReminder
+        ? 'A gentle reminder from your bottle: take a little water break.'
+        : 'Your bottle is keeping you company. Every sip counts.';
+    const sprite = shadow.querySelector<HTMLElement>('[role="img"]');
+    sprite?.classList.toggle('animate-sip-nudge', state.pendingReminder);
+    sprite?.classList.toggle('animate-sip-float', !state.pendingReminder);
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+    if (changes.widgetHidden) {
+        if (changes.widgetHidden.newValue) {
+            document.getElementById(HOST_ID)?.remove();
+        } else {
+            void mountWidget();
+        }
+    }
+    if ('daily' in changes || 'pendingReminder' in changes) {
+        void loadState().then(renderMountedWidget);
+    }
+});
+
+void mountWidget();
 
 export { };
 

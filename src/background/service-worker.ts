@@ -75,7 +75,7 @@ async function scheduleNextReminder(): Promise<void> {
 }
 
 async function showReminder(): Promise<void> {
-    await chrome.storage.local.set({ pendingReminder: true });
+    await chrome.storage.local.set({ pendingReminder: true, widgetHidden: false });
     await chrome.notifications.create(NOTIFICATION_ID, {
         type: 'basic',
         iconUrl: 'assets/icons/drop.svg',

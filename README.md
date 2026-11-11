@@ -27,6 +27,7 @@ Chrome does not allow extensions to inject into browser-internal pages such as `
 - Adjustable reminder cadence and daily active hours.
 - Notification actions to record a drink or snooze for 15 minutes.
 - A floating, animated bottle widget on webpages with a Shadow DOM-isolated Tailwind UI.
+- Hide the page widget until the next scheduled reminder, or restore it from the popup; reminders automatically bring it back.
 - Shared Tailwind theme and animation styles in the root `global.css` file.
 - Animated CSS bottle that visibly empties with each check-in.
 - Daily drink count and settings saved locally in the browser.
