@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+    --color-ink: #1d3836;
+    --color-green: #2f7970;
+    --color-paper: #f6f7ee;
+    --color-coral: #ff916f;
+    --color-muted: #72817a;
+    --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-display: "Manrope", ui-sans-serif, system-ui, sans-serif;
+    --animate-bottle-float: bottle-float 3.2s ease-in-out infinite;
+    --animate-twinkle: twinkle 2.4s ease-in-out infinite;
+    --animate-bottle-sip: bottle-sip 850ms ease-in-out;
+    --animate-sip-float: sip-float 3.2s ease-in-out infinite;
+    --animate-sip-drink: sip-drink 800ms ease-in-out;
+    --animate-sip-nudge: sip-nudge 900ms ease-in-out 3;
+
+    @keyframes bottle-float {
+
+        0%,
+        100% {
+            transform: translateY(0) rotate(-2deg);
+        }
+
+        50% {
+            transform: translateY(-0.3125rem) rotate(2deg);
+        }
+    }
+
+    @keyframes twinkle {
+
+        0%,
+        100% {
+            opacity: .48;
+            transform: scale(.85);
+        }
+
+        50% {
+            opacity: 1;
+            transform: scale(1.12);
+        }
+    }
+
+    @keyframes bottle-sip {
+
+        0%,
+        100% {
+            transform: rotate(0) translateY(0);
+        }
+
+        30% {
+            transform: rotate(12deg) translateY(-0.3125rem);
+        }
+
+        62% {
+            transform: rotate(-9deg) translateY(-0.125rem);
+        }
+    }
+
+    @keyframes sip-float {
+
+        0%,
+        100% {
+            transform: translateY(0) rotate(-2deg);
+        }
+
+        50% {
+            transform: translateY(-0.25rem) rotate(2deg);
+        }
+    }
+
+    @keyframes sip-drink {
+
+        0%,
+        100% {
+            transform: rotate(0) translateY(0);
+        }
+
+        30% {
+            transform: rotate(12deg) translateY(-0.25rem);
+        }
+
+        62% {
+            transform: rotate(-9deg) translateY(-0.125rem);
+        }
+    }
+
+    @keyframes sip-nudge {
+
+        0%,
+        100% {
+            transform: rotate(0) translateY(0);
+        }
+
+        35% {
+            transform: rotate(9deg) translateY(-0.3125rem);
+        }
+
+        70% {
+            transform: rotate(-8deg) translateY(-0.125rem);
+        }
+    }
+}
+
+:host {
+    @apply fixed right-5 bottom-5 z-[2147483647] font-sans leading-[1.4] text-ink;
+}

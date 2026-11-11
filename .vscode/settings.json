@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^node --check dist/content\\.js && node --check dist/service-worker\\.js && node --input-type=module -e \"import fs from 'node:fs'; import path from 'node:path'; const root='dist'; const m=JSON\\.parse\\(fs\\.readFileSync\\(path\\.join\\(root,'manifest\\.json'\\),'utf8'\\)\\); const files=\\[m\\.background\\.service_worker,m\\.action\\.default_popup,\\.\\.\\.m\\.content_scripts\\.flatMap\\(\\(s\\)=>s\\.js\\),'assets/icons/drop\\.svg'\\]; for \\(const f of files\\) if \\(!fs\\.existsSync\\(path\\.join\\(root,f\\)\\)\\) throw new Error\\('Missing output: '\\+f\\); const html=fs\\.readFileSync\\(path\\.join\\(root,m\\.action\\.default_popup\\),'utf8'\\); for \\(const \\[,ref\\] of html\\.matchAll\\(/\\(\\?:src\\|href\\)=\\\\\"\\(\\[\\^\\\\\"\\]\\+\\)\\\\\"/g\\)\\) \\{ if \\(/\\^\\(https\\?:\\|data:\\|#\\)/\\.test\\(ref\\)\\) continue; const target=path\\.resolve\\(root,path\\.dirname\\(m\\.action\\.default_popup\\),ref\\); if \\(!fs\\.existsSync\\(target\\)\\) throw new Error\\('Broken popup reference: '\\+ref\\); \\} console\\.log\\('Manifest and generated popup references are valid'\\);\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

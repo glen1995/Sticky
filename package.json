@@ -1,0 +1,19 @@
+{
+    "name": "sip-water-reminder",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "build": "npm run typecheck && vite build",
+        "dev": "vite build --watch"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.1.17",
+        "@types/chrome": "^0.0.287",
+        "@types/node": "^22.10.2",
+        "tailwindcss": "^4.1.17",
+        "typescript": "^5.7.2",
+        "vite": "^7.2.2"
+    }
+}
