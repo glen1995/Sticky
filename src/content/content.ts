@@ -15,7 +15,15 @@ interface WidgetState {
     pendingReminder: boolean;
 }
 
+type WidgetEdge = 'left' | 'right' | 'top' | 'bottom';
+
+interface WidgetPosition {
+    edge: WidgetEdge;
+    offset: number;
+}
+
 const HOST_ID = 'sip-water-reminder-host';
+const EDGE_MARGIN = 16;
 
 function todayKey(date = new Date()): string {
     const year = date.getFullYear();
@@ -40,7 +48,7 @@ async function loadState(): Promise<WidgetState> {
 }
 
 async function mountWidget(): Promise<void> {
-    const stored = await chrome.storage.local.get('widgetHidden');
+    const stored = await chrome.storage.local.get(['widgetHidden', 'widgetPosition']);
     if (stored.widgetHidden) return;
     if (document.getElementById(HOST_ID)) return;
 
@@ -90,13 +98,91 @@ async function mountWidget(): Promise<void> {
     `;
 
     (document.body ?? document.documentElement).append(host);
+    const savedPosition = stored.widgetPosition as WidgetPosition | undefined;
     const panel = getElement<HTMLElement>(shadow, 'sip-panel');
     const toggle = getElement<HTMLButtonElement>(shadow, 'sip-toggle');
     const sprite = shadow.querySelector<HTMLElement>('[role="img"]');
+    let activePosition: WidgetPosition = savedPosition && ['left', 'right', 'top', 'bottom'].includes(savedPosition.edge)
+        ? savedPosition
+        : { edge: 'right', offset: window.innerHeight - host.getBoundingClientRect().height - EDGE_MARGIN };
+
+    function clamp(value: number, min: number, max: number): number {
+        return Math.min(Math.max(value, min), Math.max(min, max));
+    }
+
+    function applyPosition(position: WidgetPosition): void {
+        const bounds = host.getBoundingClientRect();
+        const horizontal = position.edge === 'top' || position.edge === 'bottom';
+        const offset = horizontal
+            ? clamp(position.offset, EDGE_MARGIN, window.innerWidth - bounds.width - EDGE_MARGIN)
+            : clamp(position.offset, EDGE_MARGIN, window.innerHeight - bounds.height - EDGE_MARGIN);
+        activePosition = { edge: position.edge, offset };
+        host.dataset.edge = position.edge;
+        host.dataset.align = position.edge === 'left' || (horizontal && offset + bounds.width / 2 < window.innerWidth / 2) ? 'left' : 'right';
+        host.dataset.panelSide = position.edge === 'top' || ((position.edge === 'left' || position.edge === 'right') && offset + bounds.height / 2 < window.innerHeight / 2)
+            ? 'below'
+            : 'above';
+        host.style.right = 'auto';
+        host.style.bottom = 'auto';
+        if (position.edge === 'left') {
+            host.style.left = `${EDGE_MARGIN}px`;
+            host.style.top = `${offset}px`;
+        } else if (position.edge === 'right') {
+            host.style.left = 'auto';
+            host.style.right = `${EDGE_MARGIN}px`;
+            host.style.top = `${offset}px`;
+        } else if (position.edge === 'top') {
+            host.style.left = `${offset}px`;
+            host.style.top = `${EDGE_MARGIN}px`;
+        } else {
+            host.style.left = `${offset}px`;
+            host.style.top = 'auto';
+            host.style.bottom = `${EDGE_MARGIN}px`;
+        }
+    }
+
+    if (savedPosition) applyPosition(activePosition);
+
+    function updatePopupPlacement(): void {
+        const toggleBounds = toggle.getBoundingClientRect();
+        const panelWidth = panel.getBoundingClientRect().width;
+        const leftSpace = toggleBounds.left - EDGE_MARGIN;
+        const rightSpace = window.innerWidth - toggleBounds.right - EDGE_MARGIN;
+        let align: 'left' | 'right';
+        if (activePosition.edge === 'left') {
+            align = 'left';
+        } else if (activePosition.edge === 'right') {
+            align = 'right';
+        } else if (leftSpace >= panelWidth || leftSpace >= rightSpace) {
+            align = 'left';
+        } else {
+            align = 'right';
+        }
+        host.dataset.align = align;
+        panel.style.maxWidth = `${Math.max(0, align === 'left' ? rightSpace + toggleBounds.width : leftSpace + toggleBounds.width)}px`;
+
+        const panelHeight = panel.scrollHeight;
+        const belowSpace = window.innerHeight - toggleBounds.bottom - EDGE_MARGIN - 12;
+        const aboveSpace = toggleBounds.top - EDGE_MARGIN - 12;
+        const panelSide = belowSpace >= panelHeight || (aboveSpace < panelHeight && belowSpace >= aboveSpace)
+            ? 'below'
+            : 'above';
+        host.dataset.panelSide = panelSide;
+        panel.style.maxHeight = `${Math.max(0, panelSide === 'below' ? belowSpace : aboveSpace)}px`;
+        panel.style.overflowY = 'auto';
+    }
 
     function setPanelOpen(open: boolean): void {
         panel.classList.toggle('hidden', !open);
         toggle.setAttribute('aria-expanded', String(open));
+        if (open) {
+            updatePopupPlacement();
+        } else {
+            panel.style.maxWidth = '';
+            panel.style.maxHeight = '';
+            panel.style.overflowY = '';
+            applyPosition(activePosition);
+        }
     }
 
     function render(state: WidgetState): void {
@@ -110,7 +196,62 @@ async function mountWidget(): Promise<void> {
         sprite?.classList.toggle('animate-sip-float', !state.pendingReminder);
     }
 
-    toggle.addEventListener('click', () => setPanelOpen(panel.classList.contains('hidden')));
+    let dragStart: { pointerId: number; x: number; y: number; left: number; top: number; moved: boolean } | undefined;
+    let suppressNextClick = false;
+
+    toggle.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        const bounds = host.getBoundingClientRect();
+        dragStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, left: bounds.left, top: bounds.top, moved: false };
+        toggle.setPointerCapture(event.pointerId);
+    });
+    toggle.addEventListener('pointermove', (event) => {
+        if (!dragStart || event.pointerId !== dragStart.pointerId) return;
+        const deltaX = event.clientX - dragStart.x;
+        const deltaY = event.clientY - dragStart.y;
+        if (!dragStart.moved && Math.hypot(deltaX, deltaY) < 5) return;
+        dragStart.moved = true;
+        host.dataset.dragging = 'true';
+        host.style.right = 'auto';
+        host.style.bottom = 'auto';
+        host.style.left = `${clamp(dragStart.left + deltaX, EDGE_MARGIN, window.innerWidth - host.offsetWidth - EDGE_MARGIN)}px`;
+        host.style.top = `${clamp(dragStart.top + deltaY, EDGE_MARGIN, window.innerHeight - host.offsetHeight - EDGE_MARGIN)}px`;
+    });
+
+    function finishDragging(event: PointerEvent): void {
+        if (!dragStart || event.pointerId !== dragStart.pointerId) return;
+        if (dragStart.moved) {
+            suppressNextClick = true;
+            window.setTimeout(() => { suppressNextClick = false; }, 0);
+            delete host.dataset.dragging;
+            const bounds = host.getBoundingClientRect();
+            const distances = [
+                { edge: 'left' as const, distance: bounds.left },
+                { edge: 'right' as const, distance: window.innerWidth - bounds.right },
+                { edge: 'top' as const, distance: bounds.top },
+                { edge: 'bottom' as const, distance: window.innerHeight - bounds.bottom },
+            ];
+            const nearest = distances.reduce((best, candidate) => candidate.distance < best.distance ? candidate : best);
+            const horizontal = nearest.edge === 'top' || nearest.edge === 'bottom';
+            applyPosition({ edge: nearest.edge, offset: horizontal ? bounds.left : bounds.top });
+            void chrome.storage.local.set({ widgetPosition: activePosition });
+        }
+        dragStart = undefined;
+    }
+
+    toggle.addEventListener('pointerup', finishDragging);
+    toggle.addEventListener('pointercancel', finishDragging);
+    toggle.addEventListener('click', () => {
+        if (suppressNextClick) return;
+        setPanelOpen(panel.classList.contains('hidden'));
+    });
+    window.addEventListener('resize', () => {
+        if (panel.classList.contains('hidden')) {
+            applyPosition(activePosition);
+        } else {
+            updatePopupPlacement();
+        }
+    });
     getElement<HTMLButtonElement>(shadow, 'sip-close').addEventListener('click', () => setPanelOpen(false));
     getElement<HTMLButtonElement>(shadow, 'sip-drink').addEventListener('click', () => {
         if (sprite) {

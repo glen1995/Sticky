@@ -103,5 +103,42 @@
 }
 
 :host {
-    @apply fixed right-5 bottom-5 z-[2147483647] font-sans leading-[1.4] text-ink;
+    @apply fixed right-5 bottom-5 z-2147483647 w-max max-w-[calc(100vw-2rem)] font-sans leading-[1.4] text-ink;
+}
+
+:host([data-align="left"]) #sip-widget {
+    align-items: flex-start;
+}
+
+:host([data-align="right"]) #sip-widget {
+    align-items: flex-end;
+}
+
+:host #sip-panel {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 0.75rem);
+}
+
+:host([data-align="left"]) #sip-panel {
+    right: auto;
+    left: 0;
+}
+
+:host([data-panel-side="below"]) #sip-panel {
+    top: calc(100% + 0.75rem);
+    bottom: auto;
+}
+
+#sip-toggle {
+    cursor: grab;
+    touch-action: none;
+}
+
+:host([data-dragging="true"]) #sip-toggle {
+    cursor: grabbing;
+}
+
+:host([data-dragging="true"]) {
+    user-select: none;
 }
